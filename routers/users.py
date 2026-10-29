@@ -1,23 +1,25 @@
-from fastapi import APIRouter, HTTPException
-from database import get_db_connection
-from models.book import UserCreate
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from database import get_db
+from models.db_models import UserDB
+from pydantic import BaseModel
 
 router = APIRouter()
 
+class UserCreate(BaseModel):
+    name: str
+    email: str
+
 @router.post("/users")
-def user_plus(user:UserCreate):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO users(name, email) VALUES(?, ?),"(user.name,user.email))
-    conn.commit()
-    conn.close()
-    return {"message": f"Пользователь'{user.name}'добавлен"}
+async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
+    new_user = UserDB(name=user.name, email=user.email)
+    db.add(new_user)
+    await db.commit()
+    return {"message": f"Пользователь '{user.name}' добавлен"}
 
 @router.get("/users")
-def get_users():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users")
-    users = cursor.fetchall()
-    conn.close()
-    return [dict(user) for user in users]
+async def get_users(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(UserDB))
+    users = result.scalars().all()
+    return [{"id": u.id, "name": u.name, "email": u.email} for u in users]

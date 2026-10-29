@@ -1,32 +1,21 @@
-import sqlite3
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import DeclarativeBase
+import os
+# 1. Настройка подключения
+# ВАЖНО: замени "твой_пароль" на тот пароль, который ты придумал при установке PostgreSQL!
+# "postgres" — это имя пользователя по умолчанию.
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:m20A12n2006@localhost:5432/postgres")
 
-def get_db_connection():
-    connection = sqlite3.connect('todo.db')
-    connection.row_factory = sqlite3.Row
-    return connection
+engine = create_async_engine(DATABASE_URL, echo=True)
 
-def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS tasks (
-            id INTEGER PRIMARY KEY,
-            title TEXT NOT NULL,
-            completed BOOLEAN NOT NULL DEFAULT 0
-        )
-    ''')
-    conn.commit()
-    conn.close()
+# 2. Создаем фабрику сессий (через нее мы будем общаться с базой)
+async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-def init_db2():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS books (
-            id INTEGER PRIMARY KEY,
-            title TEXT NOT NULL,
-            authot TEXT NOT NULL
-        )
-    ''')
-    conn.commit()
-    conn.close()
+# 3. Базовый класс для всех наших моделей
+class Base(DeclarativeBase):
+    pass
+
+# 4. Функция для получения сессии (пригодится в эндпоинтах)
+async def get_db():
+    async with async_session() as session:
+        yield session

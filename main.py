@@ -1,16 +1,10 @@
 from fastapi import FastAPI
-from database import init_db, init_db2
-from routers import tasks, books
-from routers import tasks, books, users 
+from routers import tasks, books, users
 
 app = FastAPI()
 
-@app.on_event("startup")
-def startup():
-    init_db()
-    init_db2()
+# startup() можно вообще удалить
 
-# Подключаем наши роутеры к основному приложению
 app.include_router(tasks.router)
 app.include_router(books.router)
 app.include_router(users.router)
