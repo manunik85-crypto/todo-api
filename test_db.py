@@ -1,6 +1,6 @@
 import asyncio
 from database import engine, Base
-from models.db_models import TaskDB, BookDB, UserDB
+from models.db_models import TaskDB, BookDB, UserDB, NoteDB
 
 async def reset_db():
     async with engine.begin() as conn:

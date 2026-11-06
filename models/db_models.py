@@ -31,5 +31,14 @@ class UserDB(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
-    email: Mapped[str] = mapped_column(String(100))
+    email: Mapped[str] = mapped_column(String(100), unique=True)  # <--- добавили unique=True
     tasks: Mapped[list["TaskDB"]] = relationship(back_populates="user")
+    password: Mapped[str] = mapped_column(String(100))
+    notes: Mapped[list["NoteDB"]] = relationship(back_populates="user")
+
+class NoteDB(Base):
+    __tablename__ = "notes"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    text: Mapped[str] = mapped_column(String(100))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    user: Mapped["UserDB"] = relationship(back_populates="notes")

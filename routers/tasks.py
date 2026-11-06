@@ -4,32 +4,44 @@ from sqlalchemy import select, update, delete
 from database import get_db
 from models.db_models import TaskDB
 from pydantic import BaseModel, Field
+from auth import get_current_user
+from models.db_models import UserDB
 
 router = APIRouter()
 
 # Модель для создания задачи
 class TaskCreate(BaseModel):
-    title: str = Field(min_lengt=3, descripton="Название задачи")
+    title: str = Field(min_length=3, description="Название задачи")
+    user_id: int
 
 # 1. POST: Создать задачу
 @router.post("/tasks")
-async def create_task(task: TaskCreate, db: AsyncSession = Depends(get_db)):
-    new_task = TaskDB(title=task.title, completed=False, user_id=task.user_id)
+async def create_task(
+    task: TaskCreate, 
+    db: AsyncSession = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)  # <--- ВОТ ОНА, МАГИЯ!
+):
+    new_task = TaskDB(
+        title=task.title, 
+        completed=False, 
+        user_id=current_user.id  # <--- Берем ID из токена!
+    )
     db.add(new_task)
     await db.commit()
-    return {"message": f"Задача '{task.title}' добавлена"}
+    return {"message": f"Задача '{task.title}' добавлена пользователю {current_user.name}"}
+
 
 # 2. GET: Получить все задачи
 @router.get("/tasks")
-async def get_tasks(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(TaskDB))
+async def get_tasks(db: AsyncSession = Depends(get_db),current_user: UserDB = Depends(get_current_user)):
+    result = await db.execute(select(TaskDB).where(TaskDB.user_id == current_user.id))
     tasks = result.scalars().all()
     return [{"id": t.id, "title": t.title, "completed": t.completed} for t in tasks]
 
 # 3. PUT: Отметить задачу выполненной
 @router.put("/tasks/{task_id}/complete")
-async def complete_task(task_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(TaskDB).where(TaskDB.id == task_id))
+async def complete_task(task_id: int, db: AsyncSession = Depends(get_db),current_user: UserDB = Depends(get_current_user)):
+    result = await db.execute(select(TaskDB).where(TaskDB.id == task_id, TaskDB.user_id == current_user.id))
     task = result.scalar_one_or_none()
     
     if not task:
@@ -41,8 +53,15 @@ async def complete_task(task_id: int, db: AsyncSession = Depends(get_db)):
 
 # 4. DELETE: Удалить задачу
 @router.delete("/tasks/{task_id}")
-async def delete_task(task_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(TaskDB).where(TaskDB.id == task_id))
+async def delete_task(
+    task_id: int, 
+    db: AsyncSession = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)  # <--- Охранник
+):
+    # ВОТ ЭТА СТРОКА ДЕЛАЕТ ВСЮ МАГИЮ
+    result = await db.execute(
+        select(TaskDB).where(TaskDB.id == task_id, TaskDB.user_id == current_user.id)
+    )
     task = result.scalar_one_or_none()
     
     if not task:
@@ -50,4 +69,4 @@ async def delete_task(task_id: int, db: AsyncSession = Depends(get_db)):
         
     await db.delete(task)
     await db.commit()
-    return {"message": f"Задача с ID {task_id} удалена"}
+    return {"message": f"Задача {task_id} удалена"}
